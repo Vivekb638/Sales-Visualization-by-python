@@ -6,9 +6,9 @@ from matplotlib.ticker import FuncFormatter
 from scipy.stats import ttest_ind, f_oneway, chi2_contingency, levene
 import warnings
 warnings.filterwarnings('ignore')
-# main
+
 sns.set_style('whitegrid')
-#loading the data
+
 def load_data(file_path):
     try:
         df = pd.read_excel(file_path)
