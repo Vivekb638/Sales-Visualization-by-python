@@ -19,7 +19,6 @@ The **Sales Visualization Dashboard** is designed to help businesses easily unde
 - 🧩 **Clean and Simple Layout** – Easy to use and interpret visuals.
 - 📂 **Data Automation with Python** – Process and clean raw sales data using a Python script.
 - 🔄 **Refreshable Excel Dashboard** – Update dashboard instantly when new data is available.
-
 ---
 
 ## 📁 Files Included
