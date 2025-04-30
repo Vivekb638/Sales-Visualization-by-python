@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.ticker import FuncFormatter
-from scipy.stats import ttest_ind, f_oneway, chi2_contingency, levene
+from scipy import stats
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -74,68 +74,108 @@ def clean_data(df):
     df.info()
     return df
 
-def hypothesis_testing(df):
+def run_statistical_tests(df):
     if df is None or df.empty:
-        print("Error: No data for hypothesis testing.")
+        print("Error: No data for statistical testing.")
         return
 
-    print("\n=== Hypothesis Testing ===")
+    print("\n🔬 Running Statistical Tests:")
 
-    # Test 1: Difference in Sales Amount Between Genders (T-test)
-    print("\nTest 1: Difference in Sales Amount Between Genders")
+    # Test 1: T-Test - Compare sales between two genders
+    print("\nT-Test between Female and Male Sales:")
     female_sales = df[df['Gender'] == 'Female']['Amount'].dropna()
     male_sales = df[df['Gender'] == 'Male']['Amount'].dropna()
 
     if len(female_sales) > 0 and len(male_sales) > 0:
-      
-        levene_stat, levene_p = levene(female_sales, male_sales)
-        print(f"Levene's Test for Equal Variances: p-value = {levene_p:.4f}")
-        equal_var = levene_p > 0.05
-
-        # Perform t-test
-        t_stat, p_value = ttest_ind(female_sales, male_sales, equal_var=equal_var)
-        print(f"T-test: t-statistic = {t_stat:.4f}, p-value = {p_value:.4f}")
-        if p_value < 0.05:
-            print("Result: Reject null hypothesis - Significant difference in sales between genders.")
+        t_stat, p_val = stats.ttest_ind(female_sales, male_sales, equal_var=False)
+        
+        print(f"   T-statistic = {t_stat:.4f}")
+        print(f"   P-value = {p_val:.4f}")
+        
+        if p_val < 0.05:
+            print("   → Statistically significant difference in sales between genders.")
         else:
-            print("Result: Fail to reject null hypothesis - No significant difference in sales between genders.")
+            print("   → No significant difference found in sales between genders.")
     else:
-        print("Error: Insufficient data for gender sales test.")
+        print("   No sufficient data for gender comparison.")
 
-    # Test 2: Difference in Sales Across Top Categories (ANOVA)
-    print("\nTest 2: Difference in Sales Across Top Categories")
-    top_categories = df.groupby('Category')['Amount'].sum().nlargest(3).index
-    category_sales = [df[df['Category'] == cat]['Amount'].dropna() for cat in top_categories]
-
-    if all(len(sales) > 0 for sales in category_sales):
-        # Check equal variances
-        levene_stat_anova, levene_p_anova = levene(*category_sales)
-        print(f"Levene's Test for Equal Variances: p-value = {levene_p_anova:.4f}")
-
-        # Perform ANOVA
-        f_stat, p_value_anova = f_oneway(*category_sales)
-        print(f"ANOVA: F-statistic = {f_stat:.4f}, p-value = {p_value_anova:.4f}")
-        if p_value_anova < 0.05:
-            print(f"Result: Reject null hypothesis - Significant difference in sales across categories {top_categories.tolist()}.")
+    # Test 2: T-Test - Compare sales between top two categories
+    top_categories = df.groupby('Category')['Amount'].sum().nlargest(2).index.tolist()
+    
+    if len(top_categories) >= 2:
+        cat1, cat2 = top_categories[0], top_categories[1]
+        print(f"\nT-Test between {cat1} and {cat2} Categories:")
+        
+        cat1_sales = df[df['Category'] == cat1]['Amount'].dropna()
+        cat2_sales = df[df['Category'] == cat2]['Amount'].dropna()
+        
+        if len(cat1_sales) > 0 and len(cat2_sales) > 0:
+            t_stat, p_val = stats.ttest_ind(cat1_sales, cat2_sales, equal_var=False)
+            
+            print(f"   T-statistic = {t_stat:.4f}")
+            print(f"   P-value = {p_val:.4f}")
+            
+            if p_val < 0.05:
+                print(f"   → Statistically significant difference in sales between {cat1} and {cat2}.")
+            else:
+                print(f"   → No significant difference found in sales between categories.")
         else:
-            print(f"Result: Fail to reject null hypothesis - No significant difference in sales across categories {top_categories.tolist()}.")
+            print("   No sufficient data for category comparison.")
     else:
-        print("Error: Insufficient data for category sales test.")
+        print("   Not enough categories for comparison.")
 
-    # Test 3: Association Between Channel and Order Status (Chi-square)
-    print("\nTest 3: Association Between Channel and Order Status")
-    contingency_table = pd.crosstab(df['Channel'], df['Status'])
-    if not contingency_table.empty:
-        chi2_stat, p_value_chi2, dof, expected = chi2_contingency(contingency_table)
-        print(f"Chi-square Test: Chi2-statistic = {chi2_stat:.4f}, p-value = {p_value_chi2:.4f}, degrees of freedom = {dof}")
-        if (expected < 5).any():
-            print("Warning: Some expected counts are less than 5, Chi-square results may be unreliable.")
-        if p_value_chi2 < 0.05:
-            print("Result: Reject null hypothesis - Significant association between channel and order status.")
+    # Test 3: Z-Test - Compare channel sales to overall mean
+    top_channel = df['Channel'].value_counts().index[0] if 'Channel' in df.columns and not df['Channel'].empty else None
+    
+    if top_channel:
+        print(f"\n📌 Z-Test for {top_channel} vs overall sales mean:")
+        
+        channel_sales = df[df['Channel'] == top_channel]['Amount'].dropna()
+        overall_mean = df['Amount'].mean()
+        overall_std = df['Amount'].std()
+        sample_size = len(channel_sales)
+        
+        if sample_size > 0:
+            z_score = (channel_sales.mean() - overall_mean) / (overall_std / np.sqrt(sample_size))
+            # Two-tailed p-value
+            p_val = 2 * (1 - stats.norm.cdf(abs(z_score)))
+            
+            print(f"   Z-score = {z_score:.4f}")
+            print(f"   P-value = {p_val:.4f}")
+            
+            if p_val < 0.05:
+                print(f"   → {top_channel} has significantly different sales from the overall average.")
+            else:
+                print(f"   → No significant difference from the overall sales average.")
         else:
-            print("Result: Fail to reject null hypothesis - No significant association between channel and order status.")
+            print(f"   No data found for channel: {top_channel}")
     else:
-        print("Error: Insufficient data for channel-status test.")
+        print("   No channel data available for Z-test.")
+
+    # Test 4: Z-Test - Compare state sales to overall mean
+    if 'ship-state' in df.columns:
+        top_state = df['ship-state'].value_counts().index[0]
+        print(f"\n📌 Z-Test for {top_state} vs overall sales mean:")
+        
+        state_sales = df[df['ship-state'] == top_state]['Amount'].dropna()
+        overall_mean = df['Amount'].mean()
+        overall_std = df['Amount'].std()
+        sample_size = len(state_sales)
+        
+        if sample_size > 0:
+            z_score = (state_sales.mean() - overall_mean) / (overall_std / np.sqrt(sample_size))
+            # Two-tailed p-value
+            p_val = 2 * (1 - stats.norm.cdf(abs(z_score)))
+            
+            print(f"   Z-score = {z_score:.4f}")
+            print(f"   P-value = {p_val:.4f}")
+            
+            if p_val < 0.05:
+                print(f"   → {top_state} has significantly different sales from the overall average.")
+            else:
+                print(f"   → No significant difference from the overall sales average.")
+        else:
+            print(f"   No data found for state: {top_state}")
 
 def visualize_data(df):
     if df is None or df.empty:
@@ -179,6 +219,16 @@ def visualize_data(df):
     plt.gca().yaxis.set_major_formatter(FuncFormatter(thousands_formatter))
     plt.tight_layout()
     plt.show()
+    
+    # NEW VISUALIZATION: Box Plot of Sales Amount by Age Group
+    plt.figure(figsize=(12, 8))
+    sns.boxplot(x='Age Group', y='Amount', data=df, palette='viridis')
+    plt.title('Distribution of Sales Amount by Age Group', fontsize=14)
+    plt.xlabel('Age Group', fontsize=12)
+    plt.ylabel('Sales Amount (INR)', fontsize=12)
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    plt.show()
 
     # Objective 4: Channel-wise Order Volume
     plt.figure(figsize=(10, 6))
@@ -196,23 +246,35 @@ def visualize_data(df):
     plt.title('Order Status Breakdown', fontsize=14)
     plt.tight_layout()
     plt.show()
+    
+    # NEW VISUALIZATION: Correlation Heatmap
+    # Select only numeric columns for correlation
+    numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
+    if len(numeric_cols) >= 2:  # Need at least 2 numeric columns for correlation
+        plt.figure(figsize=(10, 8))
+        correlation_matrix = df[numeric_cols].corr()
+        mask = np.triu(np.ones_like(correlation_matrix, dtype=bool))  # Create mask for upper triangle
+        sns.heatmap(correlation_matrix, mask=mask, annot=True, fmt='.2f', cmap='coolwarm', 
+                    linewidths=0.5, cbar_kws={'label': 'Correlation Coefficient'})
+        plt.title('Correlation Heatmap of Numeric Variables', fontsize=14)
+        plt.tight_layout()
+        plt.show()
+    else:
+        print("Not enough numeric columns for correlation heatmap.")
 
 def main():
     
     file_path = r'E:\Python Project 1\Vrinda Store Data Analysis.xlsx'
     
-
     df = load_data(file_path)
     
     df = clean_data(df)
     
-    hypothesis_testing(df)
+    run_statistical_tests(df)  # Updated function name
 
     visualize_data(df)
     
-    print("\nData cleaning, hypothesis testing, and visualizations completed successfully.")
+    print("\nData cleaning, statistical testing, and visualizations completed successfully.")
 
 if __name__ == "__main__":
     main()
-
-
